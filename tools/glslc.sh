@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 #
 # Every shader through glslc, the one shader check that needs no GL driver.
-# Called by tools/verify.sh AND by CI, so the two cannot drift: a runner with
-# no accelerated GL cannot compile a shader through a driver, and this is how
-# CI covers the shaders instead (fgtest --offline covers the CPU half).
-# (ferrofluid's script, by way of fountain; only the ASSEMBLED table below is
-# filings'.)
+# Called by tools/verify.sh. (ferrofluid's script, by way of fountain and
+# filings; only the ASSEMBLED table below is intensifier's.)
 #
 #     tools/glslc.sh          exit 0 when every shader compiles, or glslc is absent
-#     GLSLC_REQUIRED=1 tools/glslc.sh   ...and a missing glslc is a failure (CI)
+#     GLSLC_REQUIRED=1 tools/glslc.sh   ...and a missing glslc is a failure
 #
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -48,14 +45,19 @@ FILES = [
 ]
 
 # Shaders the plugin assembles at run time, in the order Shaders.cpp's
-# AssembleVertex() and Assemble() use: the needles (an instanced quad a
-# filing) into the transmission buffer, then the composite. Every pass is
-# listed; a name that has moved is a KeyError.
+# AssembleVertex() and Assemble() use: one full-raster triangle for every
+# pass, then the eight fragment shaders. Every pass is listed; a name that
+# has moved is a KeyError.
 ASSEMBLED = {
-	"quad":          [ "kVersion", "kQuadVertex" ],
-	"needlevert":    [ "kVersion", "kNeedleVertex" ],
-	"needles":       [ "kVersion", "kNeedleFragment" ],
-	"composite":     [ "kVersion", "kCommon", "kCompositeFragment" ],
+	"quad":      [ "kVersion", "kQuadVertex" ],
+	"rate":      [ "kVersion", "kCommon", "kRateFragment" ],
+	"reduce":    [ "kVersion", "kReduceFragment" ],
+	"control":   [ "kVersion", "kControlFragment" ],
+	"halo":      [ "kVersion", "kHaloFragment" ],
+	"count":     [ "kVersion", "kRandom", "kSamplers", "kCountFragment" ],
+	"phosphor":  [ "kVersion", "kPhosphorFragment" ],
+	"resample":  [ "kVersion", "kResampleFragment" ],
+	"composite": [ "kVersion", "kCommon", "kRandom", "kCompositeFragment" ],
 }
 
 named, unnamed = {}, []

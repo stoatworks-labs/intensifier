@@ -69,6 +69,24 @@ int hHaloFactor( double radiusPx )
 {
 	return std::max( 1, static_cast< int >( std::ceil( radiusPx / 6.0 - 1e-9 ) ) );
 }
+/// The display's spot: a Gaussian whose MTF exp( -2 pi^2 sigma^2 f^2 ) is 5%
+/// at 64 lp/mm (Photek DS001's limiting resolution, the spec's reading),
+/// sigma in px; and the share of a spot's light its centre pixel keeps, of
+/// the 5 x 5 the plugin draws (pixel-integrated, the taps renormalised).
+double hSpotSigma( int height )
+{
+	return std::sqrt( std::log( 20.0 ) / ( 2.0 * hPi * hPi ) ) / 64e3 / hPitch( height );
+}
+double hCentreShare( int height )
+{
+	const double s = hSpotSigma( height ) * std::sqrt( 2.0 );
+	auto cell      = [ & ]( int i ) { return 0.5 * ( std::erf( ( i + 0.5 ) / s ) - std::erf( ( i - 0.5 ) / s ) ); };
+	double all     = 0.0;
+	for( int i = -2; i <= 2; ++i )
+		all += cell( i );
+	const double w0 = cell( 0 ) / all;
+	return w0 * w0;
+}
 
 //===========================================================================
 // Statistics, the harness's own.
@@ -468,6 +486,61 @@ int runSampler( const Perturb& perturb )
 }
 
 //===========================================================================
+// --charge
+//===========================================================================
+int runCharge( const Perturb& perturb )
+{
+	std::printf( "\n=== charge: the plate's charge for N photoelectrons is a sum of N exponential gains, Gamma( N, 1 ) in units of the mean gain --\n"
+	             "    from the count buffer's N and Q, the probability-integral transform P( N, Q ) of 20000 counted pixels a frame is uniform\n"
+	             "    (chi-square on 20 bins, p >= 1e-6), at three Light Levels on the card (N from 1 to ~1e5)\n" );
+	std::mt19937_64 random( 3141592u );
+	for( const Raster& raster : kRasters )
+	{
+		std::vector< double > bins( 20, 0.0 );
+		double n = 0.0, nMax = 0.0, small = 0.0;
+		for( const double lux : { 1e-4, 1e-2, 1.0 } )
+		{
+			Rig rig;
+			if( !startRig( rig, raster.w, raster.h, perturb ) )
+				return 1;
+			rig.Set( PT_LIGHT, ParamFromLight( lux ) );
+			if( !rig.Render( 2 ) )
+				return 1;
+			for( int f = 0; f < 2; ++f )
+			{
+				if( !rig.Render( 1 ) )
+					return 1;
+				const Floats c = rig.Counts();
+				std::vector< size_t > counted;
+				for( size_t p = 0; p < c.size() / 4; ++p )
+					if( c[ 4 * p ] >= 1.0f )
+						counted.push_back( p );
+				if( counted.empty() )
+					continue;
+				std::uniform_int_distribution< size_t > pick( 0, counted.size() - 1 );
+				for( int s = 0; s < 20000; ++s )
+				{
+					const size_t p = counted[ pick( random ) ];
+					const double k = c[ 4 * p ], q = c[ 4 * p + 1 ];
+					nMax           = std::max( nMax, k );
+					small += k <= 4.0;
+					const double u = std::clamp( gammaP( k, std::max( q, 0.0 ) ), 0.0, 1.0 - 1e-12 );
+					bins[ static_cast< size_t >( u * 20.0 ) ] += 1.0;
+					n += 1.0;
+				}
+			}
+		}
+		std::vector< double > expected( 20, n / 20.0 );
+		const ChiSquare chi = chiSquare( bins, expected );
+		Check( chi.p >= kAlpha && small > 1000.0 && nMax > 1000.0,
+		       fmt( "%4dx%-4d %.3g counted pixels (%.3g of them with N <= 4, N up to %.4g): PIT chi2 %.1f on %d df, p %.3g (bins %.4f .. %.4f of n/20)", raster.w,
+		            raster.h, n, small, nMax, chi.chi2, chi.df, chi.p, *std::min_element( bins.begin(), bins.end() ) / ( n / 20.0 ),
+		            *std::max_element( bins.begin(), bins.end() ) / ( n / 20.0 ) ) );
+	}
+	return Verdict();
+}
+
+//===========================================================================
 // --rng
 //===========================================================================
 int runRng( const Perturb& perturb )
@@ -576,6 +649,7 @@ int runPhd( const Perturb& perturb )
 			grab( s );
 		}
 		std::vector< double > amplitudes;
+		double centreLight = 0.0, allLight = 0.0;
 		double gainSeen = 1.0;
 		const int maxFrames = h >= 720 ? 120 : 400;
 		for( int f = 0; f < maxFrames && amplitudes.size() < 20000; ++f )
@@ -597,12 +671,17 @@ int runPhd( const Perturb& perturb )
 						}
 					if( !isolated )
 						continue;
-					double sum = 0.0;
+					double sum = 0.0, centre = 0.0;
 					for( int s = 1; s < 4; ++s )
+					{
+						centre += light[ s ][ at ];
 						for( int dy = -2; dy <= 2; ++dy )
 							for( int dx = -2; dx <= 2; ++dx )
 								sum += light[ s ][ static_cast< size_t >( y + dy ) * w + x + dx ];
+					}
 					amplitudes.push_back( sum / scale );
+					centreLight += centre;
+					allLight += sum;
 				}
 			std::rotate( counts.begin(), counts.begin() + 1, counts.end() );
 			std::rotate( light.begin(), light.begin() + 1, light.end() );
@@ -631,6 +710,15 @@ int runPhd( const Perturb& perturb )
 		Check( n >= 5000 && gainSeen == 1.0 && std::fabs( zm ) <= kSigmas && std::fabs( zv ) <= kSigmas && chi.p >= kAlpha,
 		       fmt( "%4dx%-4d %.0f isolated events (ABC gain %.3g throughout): mean %.4f (%+.2f sigma), variance %.4f (%+.2f sigma), chi2 %.1f on %d df, p %.3g",
 		            w, h, n, gainSeen, mean, zm, var, zv, chi.chi2, chi.df, chi.p ) );
+		//Every event draws the same spot, so the centre pixels' share of all the
+		//events' light is the spot's. Weighted by light, not averaged by event:
+		//a faint event's share is swung by the last of an earlier event's
+		//spill. 1e-4: the sRGB code's float round trip is ~1e-6, and that
+		//spill, at the EBI's rates, ~1e-5 of the light.
+		const double share = centreLight / allLight;
+		Check( std::fabs( share - hCentreShare( h ) ) <= 1e-4,
+		       fmt( "%4dx%-4d the spot: the events' centre pixels keep %.6f of their light (the 64 lp/mm, 5%% spot's %.6f at %.3f px sigma; %+.2e, tolerance 1e-4)",
+		            w, h, share, hCentreShare( h ), hSpotSigma( h ), share - hCentreShare( h ) ) );
 	}
 	return Verdict();
 }
@@ -973,7 +1061,8 @@ double frameLight( int k, double dt, double tau )
 int runPhosphor( const Perturb& perturb )
 {
 	std::printf( "\n=== phosphor: the light spilling into the frame after a one-frame flash, read off the picture, gives the phosphor's decay time\n"
-	             "    (the harness's own quadrature of an exponential over the frames) -- P43 0.521 ms, P45 0.651 ms, to 1e-3, at 30, 60, 120 and 240 fps\n" );
+	             "    (the harness's own quadrature of an exponential over the frames) -- P43 0.521 ms, P45 0.651 ms, to 1e-3, at 30, 60, 120 and 240 fps;\n"
+	             "    and the flash's colour is the phosphor's\n" );
 	for( const Raster& raster : kRasters )
 	{
 		const int w = raster.w, h = raster.h;
@@ -981,8 +1070,10 @@ int runPhosphor( const Perturb& perturb )
 		for( const int phosphor : { static_cast< int >( kP43 ), static_cast< int >( kP45 ) } )
 		{
 			std::string line;
-			double worst = 0.0;
+			double worst = 0.0, colourOff = 0.0;
 			bool flat    = true;
+			//US 4,694,217's chromaticities (the spec's reading).
+			const double kPatentXY[ 2 ][ 2 ] = { { 0.334, 0.561 }, { 0.269, 0.311 } };
 			for( const double fps : { 30.0, 60.0, 120.0, 240.0 } )
 			{
 				Rig rig;
@@ -1015,6 +1106,20 @@ int runPhosphor( const Perturb& perturb )
 				if( !rig.Render( 1 ) )
 					return 1;
 				const double l1 = total() - base;
+				{
+					//The screen's colour: the frame's mean linear RGB, to xy by the
+					//IEC 61966-2-1 matrix (the harness's own).
+					const Floats out = rig.Output();
+					double r = 0, g = 0, b = 0;
+					for( size_t p = 0; p < out.size() / 4; ++p )
+					{
+						r += linearOf( out[ 4 * p ] );
+						g += linearOf( out[ 4 * p + 1 ] );
+						b += linearOf( out[ 4 * p + 2 ] );
+					}
+					const double X = 0.4124 * r + 0.3576 * g + 0.1805 * b, Y = 0.2126 * r + 0.7152 * g + 0.0722 * b, Z = 0.0193 * r + 0.1192 * g + 0.9505 * b;
+					colourOff = std::max( { colourOff, std::fabs( X / ( X + Y + Z ) - kPatentXY[ phosphor ][ 0 ] ), std::fabs( Y / ( X + Y + Z ) - kPatentXY[ phosphor ][ 1 ] ) } );
+				}
 				rig.Upload( black );
 				if( !rig.Render( 1 ) )
 					return 1;
@@ -1035,6 +1140,9 @@ int runPhosphor( const Perturb& perturb )
 			}
 			Check( worst <= 1e-3 && flat, fmt( "%4dx%-4d %s, source tau %.4f ms:%s%s", w, h, phosphor == kP43 ? "P43" : "P45", hTau( phosphor ) * 1e3, line.c_str(),
 			                                   flat ? "" : "  (the ABC moved: the check is void)" ) );
+			Check( colourOff <= 1e-3, fmt( "%4dx%-4d %s on the screen: the flash frames' mean colour is within %.2g of US 4,694,217's x %.3f y %.3f in xy "
+			                               "(tolerance 1e-3, the matrices' four digits)",
+			                               w, h, phosphor == kP43 ? "P43" : "P45", colourOff, kPatentXY[ phosphor ][ 0 ], kPatentXY[ phosphor ][ 1 ] ) );
 		}
 	}
 	return Verdict();
@@ -1532,6 +1640,7 @@ const std::vector< CheckEntry >& checks()
 		{ "tube", runTube, true },
 		{ "poisson", runPoisson, false },
 		{ "sampler", runSampler, false },
+		{ "charge", runCharge, false },
 		{ "rng", runRng, false },
 		{ "phd", runPhd, false },
 		{ "halo", runHalo, false },
@@ -1582,6 +1691,9 @@ int runNegative( bool offlineOnly = false )
 	add( "rng", runRng, "every instance seeded alike", []( Perturb& p ) { p.rngModel = 3; } );
 	add( "phd", runPhd, "a saturated plate: Polya, shape 4", []( Perturb& p ) { p.gainModel = 1; } );
 	add( "phd", runPhd, "a constant gain", []( Perturb& p ) { p.gainModel = 2; } );
+	add( "phd", runPhd, "the display's spot twice as wide", []( Perturb& p ) { p.tube.spotScale = 2.0; } );
+	add( "charge", runCharge, "a saturated plate: Polya, shape 4", []( Perturb& p ) { p.gainModel = 1; } );
+	add( "charge", runCharge, "a constant gain", []( Perturb& p ) { p.gainModel = 2; } );
 	add( "halo", runHalo, "the halo's radius the gap, not twice it", []( Perturb& p ) { p.tube.haloScale = 0.5; } );
 	add( "halo", runHalo, "no back-scatter", []( Perturb& p ) { p.haloOn = false; } );
 	add( "abc", runAbc, "no ABC", []( Perturb& p ) { p.abcOn = false; } );
@@ -1589,6 +1701,7 @@ int runNegative( bool offlineOnly = false )
 	add( "bsp", runBsp, "no gate", []( Perturb& p ) { p.bspOn = false; } );
 	add( "phosphor", runPhosphor, "the phosphor stepped per frame (60 fps factors at every rate)", []( Perturb& p ) { p.tube.phosphorPerFrame = true; } );
 	add( "phosphor", runPhosphor, "a decay ten times too long", []( Perturb& p ) { p.tube.tauScale = 10.0; } );
+	add( "phosphor", runPhosphor, "the screen drawn in sRGB white", []( Perturb& p ) { p.whiteScreen = true; } );
 	add( "fixed", runFixed, "the honeycomb drawn 1.25x too large", []( Perturb& p ) { p.tube.cellScale = 1.25; } );
 	add( "alpha", runAlpha, "the clip's alpha passed through", []( Perturb& p ) { p.alphaModel = 1; } );
 	add( "alpha", runAlpha, "the clip's light not weighted by its alpha", []( Perturb& p ) { p.premultiply = false; } );

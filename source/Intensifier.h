@@ -30,6 +30,7 @@ struct PluginHooks
 	bool resizeResets  = false;///< a new raster clears the phosphor and the ABC
 	bool floatClock    = false;///< the host's clock read in single precision
 	bool leakGLState   = false;///< the host's GL state not put back
+	bool whiteScreen   = false;///< the screen drawn in sRGB white, not the phosphor's colour
 	TubeHooks tube;
 };
 

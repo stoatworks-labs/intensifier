@@ -108,6 +108,7 @@ struct TubeHooks
 	bool abcPerFrame      = false;///< the ABC's lag stepped per frame, not per second
 	double haloScale      = 1.0;  ///< the halo's radius x this (0.5: radius = gap)
 	double cellScale      = 1.0;  ///< the honeycomb drawn this much larger
+	double spotScale      = 1.0;  ///< the display's spot this much wider
 };
 
 /// Everything one frame's passes need.

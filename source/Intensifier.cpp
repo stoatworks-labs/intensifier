@@ -366,6 +366,8 @@ void IntensifierPlugin::render( const FFGLTextureStruct* input, const GLint* hos
 	glUniform1f( where( compositeShader, "DisplayScale" ), static_cast< float >( frame.displayScale ) );
 	double rgb[ 3 ];
 	PhosphorColour( CurrentSettings().phosphor, rgb );
+	if( hooks.whiteScreen )
+		rgb[ 0 ] = rgb[ 1 ] = rgb[ 2 ] = 1.0;
 	glUniform3f( where( compositeShader, "PhosphorRGB" ), static_cast< float >( rgb[ 0 ] ), static_cast< float >( rgb[ 1 ] ), static_cast< float >( rgb[ 2 ] ) );
 	glUniform1f( where( compositeShader, "MixAmount" ), std::clamp( params[ PT_MIX ], 0.0f, 1.0f ) );
 	glUniform1i( where( compositeShader, "AlphaModel" ), hooks.alphaModel );

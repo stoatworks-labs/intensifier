@@ -47,7 +47,7 @@ Frame Compute( const Settings& s, int width, int height, double dt, const TubeHo
 	f.boundaryHalfPx = 0.5 * kBoundaryWidth / f.pitch;
 	//A Gaussian MTF exp( -2 pi^2 sigma^2 f^2 ) at 5% at the limiting resolution.
 	const double sigma = std::sqrt( std::log( 1.0 / kContrastAtLimit ) / ( 2.0 * kPi * kPi ) ) / kLimitingResolution;
-	f.sigmaPx          = sigma / f.pitch;
+	f.sigmaPx          = sigma * hooks.spotScale / f.pitch;
 	(void)width;
 	return f;
 }

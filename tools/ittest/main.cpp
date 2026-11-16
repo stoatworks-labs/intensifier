@@ -697,12 +697,20 @@ bool bindScript( IntensifierPlugin& plugin, std::istream& in, const std::string&
 // --pipe reads a frame from stdin for every frame it writes (the clip);
 // --film N renders N on the harness's card.
 //===========================================================================
+/// --seed N: the instance's seed (tools/clips.py compares two draws of one
+/// clip). 0 leaves the plugin's own.
+uint32_t g_seed = 0;
+/// --stats: a line on stderr a frame -- the supply's state.
+bool g_stats = false;
+
 int runPipe( int width, int height, double fps, const std::string& scriptPath, int count, bool readStdin, const std::vector< std::string >& settings )
 {
 	Rig rig;
 	rig.fps = fps;
 	if( !rig.Init( width, height ) )
 		return 1;
+	if( g_seed != 0 )
+		rig.plugin.SetSeedForTest( g_seed );
 	for( const std::string& setting : settings )
 	{
 		std::string error;
@@ -761,6 +769,11 @@ int runPipe( int width, int height, double fps, const std::string& scriptPath, i
 				rig.plugin.SetFloatParameter( cue.first, valueAt( cue.second.track, index, cue.second.ramp ) );
 		if( !rig.Render( 1 ) )
 			return 1;
+		if( g_stats )
+		{
+			const std::vector< double > c = rig.Control();
+			std::fprintf( stderr, "frame %d gain %.9g duty %.9g photocathode %.9g\n", index, c[ 0 ], c[ 1 ], c[ 2 ] );
+		}
 
 		const Floats out = rig.Output();
 		Bytes bytes( in.size() );
@@ -833,7 +846,9 @@ int main( int argc, char** argv )
 			             "  --list            every parameter and its default\n"
 			             "  --pipe            raw RGBA frames in on stdin, out on stdout\n"
 			             "  --film N          N frames, raw RGBA on stdout\n"
-			             "  --script PATH     cues for --pipe/--film: 'frame Name value'\n\n"
+			             "  --script PATH     cues for --pipe/--film: 'frame Name value'\n"
+			             "  --seed N          (with --pipe/--film/--out) the instance's seed\n"
+			             "  --stats           (with --pipe/--film) the ABC gain, gate duty and mean photocathode lux a frame, on stderr\n\n"
 			             "  --all             every check below, at 1280x720 and 320x180 (--size: that raster alone)\n"
 			             "  --negative        each check against the wrong models it must catch\n"
 			             "  --bench           ms a frame at 720p, 1080p and 4K\n"
@@ -868,6 +883,20 @@ int main( int argc, char** argv )
 		}
 		else if( argument == "--script" && hasNext )
 			scriptPath = argv[ ++i ];
+		else if( argument == "--seed" && hasNext )
+		{
+			const std::string value = argv[ ++i ];
+			char* end               = nullptr;
+			const unsigned long v   = std::strtoul( value.c_str(), &end, 10 );
+			if( value.empty() || *end != '\0' || v == 0 || v > 0xffffffffUL )
+			{
+				std::fprintf( stderr, "--seed wants a whole number from 1 to 4294967295, not '%s'\n", value.c_str() );
+				return 2;
+			}
+			g_seed = static_cast< uint32_t >( v );
+		}
+		else if( argument == "--stats" )
+			g_stats = true;
 		else if( argument == "--list" )
 			mode = "list";
 		else if( argument == "--size" && hasNext )
@@ -988,6 +1017,8 @@ int main( int argc, char** argv )
 			result = 1;
 		else
 		{
+			if( g_seed != 0 )
+				rig.plugin.SetSeedForTest( g_seed );
 			for( const std::string& setting : settings )
 			{
 				std::string error;
