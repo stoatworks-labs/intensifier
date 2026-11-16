@@ -31,6 +31,7 @@ struct PluginHooks
 	bool floatClock    = false;///< the host's clock read in single precision
 	bool leakGLState   = false;///< the host's GL state not put back
 	bool whiteScreen   = false;///< the screen drawn in sRGB white, not the phosphor's colour
+	bool boundariesOn  = true; ///< false: the honeycomb's cells keep their spread, the boundaries are not drawn
 	TubeHooks tube;
 };
 

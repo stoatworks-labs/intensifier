@@ -9,7 +9,7 @@
 # not copied), built arm64-only once. Each mutant edits its file in the copy,
 # deletes that file's object (make compares mtimes to the second, so an edit
 # within the same second as the last build would otherwise be missed), builds
-# ittest, runs the named check at 320x180 under a time limit (a mutant can
+# ittest, runs the named check at 320x180 (or the raster it names) under a time limit (a mutant can
 # hang: honeydew's lesson; a timeout counts as caught), then puts the file
 # back and deletes the object again. --resize always runs 1280x720 -> 320x180
 # and the offline --tube ignores --size. (ferrofluid's script by way of
@@ -25,6 +25,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 # file | the exact text | its one-character mutant | the check that must fail | what it is
+# A check runs at 320x180 unless it names a raster: '--phd@1280x720' (at 320x180 the spot's
+# sigma is 0.061 px, and --phd measures its centre weight there as 1.000000).
 # The fields are split on '|', so neither a target nor a mutant may contain one
 # (conway's trap): no GLSL || here.
 MUTANTS=(
@@ -57,7 +59,7 @@ MUTANTS=(
 	"source/Tube.cpp|f.abcDecay       = std::exp( -dtA / kAbcTime );|f.abcDecay       = std::exp( +dtA / kAbcTime );|--abc|C++: the ABC's lag growing, - -> +"
 	"source/Tube.cpp|f.haloRadiusPx = 2.0 * s.gap|f.haloRadiusPx = 3.0 * s.gap|--halo|C++: the halo's radius three gaps, 2 -> 3"
 	"source/Tube.cpp|return 1.0 - std::sqrt( 1.0 - u * u );|return 1.0 - std::sqrt( 2.0 - u * u );|--tube|C++: the landing CDF's shape, 1 -> 2"
-	"source/Tube.cpp|std::erf( ( i + 0.5 ) / s )|std::erf( ( i + 0.6 ) / s )|--phd|C++: the spot's pixels 1.1 wide on one side, 5 -> 6"
+	"source/Tube.cpp|std::erf( ( i + 0.5 ) / s )|std::erf( ( i + 0.6 ) / s )|--phd@1280x720|C++: the spot's pixels 1.1 wide on one side, 5 -> 6"
 	"source/Tube.cpp|-0.9689 * X + 1.8758 * Y|-0.9689 * X + 1.9758 * Y|--phosphor|C++: the XYZ-to-sRGB matrix's green, 8 -> 9"
 	"source/Tube.cpp|kMultifibre * hooks.cellScale / f.pitch;|kMultifibre * hooks.cellScale * f.pitch;|--fixed|C++: the honeycomb's cell in m x px, / -> *"
 	"source/Controls.cpp|return low * std::pow( high / low, clamp01( v ) );|return low * std::pow( high * low, clamp01( v ) );|--tube|C++: a geometric control's range high x low, / -> *"
@@ -101,14 +103,24 @@ PY
 
 	object="$( basename "$file" ).o"
 	find "$tree/build" -name "$object" -delete
+	# The binary too: a relink skipped would run the last mutant's ittest.
+	rm -f "$tree/build/ittest"
 	printf '\n== mutant %d: %s\n' "$index" "$what"
 	status=0
 	if ! cmake --build "$tree/build" --target ittest -j8 >"$WORK/build.log" 2>&1; then
 		# A mutant that does not compile proves nothing about the checks.
 		printf '   FAIL  the mutant does not build -- choose another\n'
 		tail -5 "$WORK/build.log" | sed 's/^/        /'
+	elif [[ "$file" == source/Shaders.cpp ]] && ! LC_ALL=C grep -qF -- "$mutant" "$tree/build/ittest"; then
+		# A GLSL mutant is a string literal: it must be in the binary, verbatim.
+		printf '   FAIL  the mutant is not in the built binary -- the build did not pick it up\n'
 	else
-		limit 600 "$tree/build/ittest" "$check" --size 320x180 >"$WORK/log" 2>&1 || status=$?
+		size=320x180
+		if [[ "$check" == *@* ]]; then
+			size="${check#*@}"
+			check="${check%@*}"
+		fi
+		limit 600 "$tree/build/ittest" "$check" --size "$size" >"$WORK/log" 2>&1 || status=$?
 		if [[ "$status" -eq 0 ]]; then
 			printf '   FAIL  %s still PASSES -- the check does not cover this code\n' "$check"
 		else

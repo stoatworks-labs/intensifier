@@ -374,7 +374,7 @@ void IntensifierPlugin::render( const FFGLTextureStruct* input, const GLint* hos
 	const double fixedDepth = FixedFromParam( params[ PT_FIXED ] );
 	glUniform1f( where( compositeShader, "CellPx" ), static_cast< float >( frame.cellPx ) );
 	glUniform1f( where( compositeShader, "BoundaryHalf" ), static_cast< float >( frame.boundaryHalfPx ) );
-	glUniform1f( where( compositeShader, "PatternDepth" ), static_cast< float >( fixedDepth * tube::kBoundaryDepth ) );
+	glUniform1f( where( compositeShader, "PatternDepth" ), static_cast< float >( hooks.boundariesOn ? fixedDepth * tube::kBoundaryDepth : 0.0 ) );
 	glUniform1f( where( compositeShader, "PatternSpread" ), static_cast< float >( fixedDepth * tube::kCellSpread ) );
 	glUniform2f( where( compositeShader, "FrameCentre" ), 0.5f * static_cast< float >( width ), 0.5f * static_cast< float >( height ) );
 	glDrawArrays( GL_TRIANGLES, 0, 3 );

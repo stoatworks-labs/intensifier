@@ -18,6 +18,9 @@ constexpr double hLmax     = 3.0;                    ///< cd/m^2 (chosen)
 constexpr double hTauAbc   = 0.2;                    ///< s (chosen)
 constexpr double hIlim     = 80e-9;                  ///< A (chosen)
 constexpr double hCell     = 0.45e-3;                ///< m, multifibre flat to flat (derived)
+constexpr double hBoundary = 8e-6;                   ///< m, a multifibre boundary's width: one fibre pitch (the spec)
+constexpr double hBoundaryDepth = 0.30;              ///< the boundary's loss at Fixed Pattern 1 (chosen)
+constexpr double hCellSpread    = 0.04;              ///< a cell's transmission, uniform within +-, at Fixed Pattern 1 (chosen)
 
 double hClamp01( float v )
 {
@@ -216,6 +219,19 @@ ChiSquare chiSquare( const std::vector< double >& observed, const std::vector< d
 constexpr double kAlpha = 1e-6;
 constexpr double kSigmas = 5.0;
 
+/// The larger of two errors, NaN winning: std::max( worst, NaN ) keeps
+/// worst, so a model that produced NaN would pass every "worst <= tolerance"
+/// (a mutant that divides by alpha did exactly that).
+double worse( double a, double b )
+{
+	return ( a != a || b != b ) ? std::numeric_limits< double >::quiet_NaN() : std::max( a, b );
+}
+template< typename... T >
+double worse( double a, double b, T... rest )
+{
+	return worse( worse( a, b ), rest... );
+}
+
 /// Counts, against Poisson( lam ): the mean, the variance (with the sample
 /// variance's own standard error, from Poisson's fourth central moment), and
 /// a chi-square on the pmf with exact tails.
@@ -247,6 +263,15 @@ PoissonFit fitPoisson( const std::map< long, double >& histogram, double lam )
 	const double sd = std::sqrt( lam );
 	const long lo   = std::min( kmin, static_cast< long >( std::max( 0.0, std::floor( lam - 8.0 * sd - 5.0 ) ) ) );
 	const long hi   = std::max( kmax, static_cast< long >( std::ceil( lam + 8.0 * sd + 5.0 ) ) );
+	//Counts nowhere near lambda (a broken model): no pmf to bin, and binning
+	//every k between them would take hours. Rejected outright.
+	if( hi - lo > 4000000 )
+	{
+		f.chi.chi2 = HUGE_VAL;
+		f.chi.df   = 0;
+		f.chi.p    = 0.0;
+		return f;
+	}
 	std::vector< double > obs, exp;
 	for( long k = lo; k <= hi; ++k )
 	{
@@ -597,8 +622,8 @@ int runRng( const Perturb& perturb )
 			const auto rt = corr( z0, z1, 0, 0 ), rx = corr( z0, z0, 1, 0 ), ry = corr( z0, z0, 0, 1 ), rd = corr( z0, z0, 1, 1 ), ra = corr( z0, z0, 1, -1 );
 			const auto ri    = corr( z1, other, 0, 0 );
 			const double lim = kSigmas / std::sqrt( rt.second );
-			const double worst = std::max( { std::fabs( rt.first ), std::fabs( rx.first ), std::fabs( ry.first ), std::fabs( rd.first ), std::fabs( ra.first ),
-			                                 std::fabs( ri.first ) } );
+			const double worst = worse( std::fabs( rt.first ), std::fabs( rx.first ), std::fabs( ry.first ), std::fabs( rd.first ), std::fabs( ra.first ),
+			                           std::fabs( ri.first ) );
 			Check( worst <= lim, fmt( "%4dx%-4d lambda %.3g: r frame %+.5f, x %+.5f, y %+.5f, diagonal %+.5f, anti-diagonal %+.5f, two instances %+.5f "
 			                          "(limit %.5f, n %.0f; seeds %u and %u)",
 			                          raster.w, raster.h, plan.lambda, rt.first, rx.first, ry.first, rd.first, ra.first, ri.first, lim, rt.second, a.plugin.Seed(),
@@ -888,7 +913,7 @@ int runAbc( const Perturb& perturb )
 			const double a = runs[ 0 ].logGain[ static_cast< size_t >( i ) ];
 			const double b = runs[ 1 ].logGain[ static_cast< size_t >( 2 * i + 1 ) ];
 			const double c = runs[ 2 ].logGain[ static_cast< size_t >( 4 * i + 3 ) ];
-			worstLog       = std::max( { worstLog, std::fabs( a - b ), std::fabs( a - c ) } );
+			worstLog       = worse( worstLog, std::fabs( a - b ), std::fabs( a - c ) );
 		}
 		//Two terms. Float: three roundings a frame at |ln g| <= ln 200, over
 		//the 120 fps run's 720 frames. The clock: each frame is rounded to the
@@ -1118,7 +1143,7 @@ int runPhosphor( const Perturb& perturb )
 						b += linearOf( out[ 4 * p + 2 ] );
 					}
 					const double X = 0.4124 * r + 0.3576 * g + 0.1805 * b, Y = 0.2126 * r + 0.7152 * g + 0.0722 * b, Z = 0.0193 * r + 0.1192 * g + 0.9505 * b;
-					colourOff = std::max( { colourOff, std::fabs( X / ( X + Y + Z ) - kPatentXY[ phosphor ][ 0 ] ), std::fabs( Y / ( X + Y + Z ) - kPatentXY[ phosphor ][ 1 ] ) } );
+					colourOff = worse( colourOff, std::fabs( X / ( X + Y + Z ) - kPatentXY[ phosphor ][ 0 ] ), std::fabs( Y / ( X + Y + Z ) - kPatentXY[ phosphor ][ 1 ] ) );
 				}
 				rig.Upload( black );
 				if( !rig.Render( 1 ) )
@@ -1135,7 +1160,7 @@ int runPhosphor( const Perturb& perturb )
 				}
 				const double tau = std::exp( 0.5 * ( lo + hi ) );
 				const double rel = tau / hTau( phosphor ) - 1.0;
-				worst            = std::max( worst, std::fabs( rel ) );
+				worst            = worse( worst, std::fabs( rel ) );
 				line += fmt( "  %3.0f fps: spill %.5f -> tau %.4f ms (%+.1e)", fps, s, tau * 1e3, rel );
 			}
 			Check( worst <= 1e-3 && flat, fmt( "%4dx%-4d %s, source tau %.4f ms:%s%s", w, h, phosphor == kP43 ? "P43" : "P45", hTau( phosphor ) * 1e3, line.c_str(),
@@ -1185,29 +1210,47 @@ void fft( std::vector< std::complex< double > >& a )
 int runFixed( const Perturb& perturb )
 {
 	std::printf( "\n=== fixed: the honeycomb's period, read off the picture at high light (Fixed Pattern 1): the strongest line of the averaged frame's\n"
-	             "    spectrum sits at the triangular lattice's 2 / ( sqrt 3 s ) to one DFT bin, and its three directions 60 degrees apart all show\n" );
+	             "    spectrum sits at the triangular lattice's 2 / ( sqrt 3 s ) to one DFT bin, and its three directions 60 degrees apart all show;\n"
+	             "    and its depth, everywhere: Fixed Pattern 1 against 0 (same seed, so the same photons) loses the boundary strips' share of the\n"
+	             "    light in each third of the frame, across and down\n" );
 	for( const Raster& raster : kRasters )
 	{
 		const int w = raster.w, h = raster.h;
 		const double code = codeOf( 0.5 );
 		const Floats card = grey( w, h, code );
-		Rig rig;
-		if( !startRig( rig, w, h, perturb, &card ) )
+		Rig rig, plain;
+		if( !startRig( rig, w, h, perturb, &card ) || !startRig( plain, w, h, perturb, &card ) )
 			return 1;
+		const float light = ParamFromLight( 10.0 * hLmax / ( hGainCd( ParamFromGain( 40000.0 ) ) * 0.5 * hOptics ) );
 		rig.Set( PT_FIXED, 1.0f );
-		rig.Set( PT_LIGHT, ParamFromLight( 10.0 * hLmax / ( hGainCd( ParamFromGain( 40000.0 ) ) * 0.5 * hOptics ) ) );
-		if( !rig.Render( 4 ) )
+		rig.Set( PT_LIGHT, light );
+		plain.Set( PT_FIXED, 0.0f );
+		plain.Set( PT_LIGHT, light );
+		if( !rig.Render( 4 ) || !plain.Render( 4 ) )
 			return 1;
 		const int frames = h >= 720 ? 16 : 64;
 		const int N      = h >= 720 ? 512 : 128;
 		std::vector< double > mean( static_cast< size_t >( w ) * h, 0.0 );
+		//Light summed over each third of the frame: [0..2] across (columns),
+		//[3..5] down (rows), with the pattern and without.
+		double withPattern[ 6 ] = {}, without[ 6 ] = {}, brightest = 0.0;
 		for( int f = 0; f < frames; ++f )
 		{
-			if( !rig.Render( 1 ) )
+			if( !rig.Render( 1 ) || !plain.Render( 1 ) )
 				return 1;
-			const std::vector< double > y = luminanceOf( rig.Output() );
-			for( size_t p = 0; p < y.size(); ++p )
-				mean[ p ] += y[ p ] / frames;
+			const std::vector< double > y = luminanceOf( rig.Output() ), y0 = luminanceOf( plain.Output() );
+			for( int row = 0; row < h; ++row )
+				for( int col = 0; col < w; ++col )
+				{
+					const size_t p = static_cast< size_t >( row ) * w + col;
+					mean[ p ] += y[ p ] / frames;
+					brightest = worse( brightest, y[ p ], y0[ p ] );
+					for( const int band : { 3 * col / w, 3 + 3 * row / h } )
+					{
+						withPattern[ band ] += y[ p ];
+						without[ band ] += y0[ p ];
+					}
+				}
 		}
 		const int x0 = ( w - N ) / 2, y0 = ( h - N ) / 2;
 		double avg   = 0.0;
@@ -1253,27 +1296,57 @@ int runFixed( const Perturb& perturb )
 					bestA = std::atan2( ky, kx ) * 180.0 / hPi;
 				}
 			}
-		//The three directions: the strongest bin within a bin of radius r0
-		//and 3 degrees of 30, 90 and 150.
-		double weakest = 1e300;
+		//Each of the three directions on its own: the strongest bin within 3
+		//degrees of 30, 90 and 150 and half to 1.5 r0 out must sit at r0 to a
+		//bin, and carry at least a quarter of the strongest line's power.
+		double weakest = 1e300, farthest = 0.0;
 		std::string seen;
 		for( const double dir : { 30.0, 90.0, 150.0 } )
 		{
-			double m = 0.0;
+			double m = 0.0, at = 0.0;
 			for( int ky = 0; ky <= N / 2; ++ky )
 				for( int kx = -N / 2; kx < N / 2; ++kx )
 				{
 					const double r = std::hypot( kx, ky ), a = std::atan2( ky, kx ) * 180.0 / hPi;
-					if( std::fabs( r - r0 ) <= 1.5 && std::fabs( a - dir ) <= 3.0 )
-						m = std::max( m, power( kx, ky ) );
+					if( r >= 0.5 * r0 && r <= 1.5 * r0 && std::fabs( a - dir ) <= 3.0 && power( kx, ky ) > m )
+					{
+						m  = power( kx, ky );
+						at = r;
+					}
 				}
-			weakest = std::min( weakest, m / best );
-			seen += fmt( " %.0f deg %.2f", dir, m / best );
+			weakest  = std::min( weakest, m / best );
+			farthest = worse( farthest, std::fabs( at - r0 ) );
+			seen += fmt( " %.0f deg at %.2f bins, %.2f of the strongest;", dir, at, m / best );
 		}
-		Check( std::fabs( bestR - r0 ) <= 1.0 && weakest >= 0.25,
-		       fmt( "%4dx%-4d multifibre %.2f px: lattice line expected at %.2f bins of %d, strongest at %.2f bins (%+.2f, tolerance 1) and %.1f deg; "
-		            "the three directions at r0, against the strongest:%s (each must be >= 0.25)",
-		            w, h, sPx, r0, N, bestR, bestR - r0, bestA, seen.c_str() ) );
+		Check( std::fabs( bestR - r0 ) <= 1.0 && farthest <= 1.0 && weakest >= 0.25,
+		       fmt( "%4dx%-4d multifibre %.2f px: lattice lines expected at %.2f bins of %d; strongest at %.2f bins and %.1f deg;%s each within 1 bin "
+		            "of r0 and >= 0.25",
+		            w, h, sPx, r0, N, bestR, bestA, seen.c_str() ) );
+
+		//The depth. A strip of width b along every edge of a hexagon s flat
+		//to flat covers 1 - ( 1 - 2b / s )^2 of it, and loses hBoundaryDepth
+		//of its light there. Tolerances: the cells' spread, uniform within
+		//+-hCellSpread (sd hCellSpread / sqrt 3 a cell), over the cells in a
+		//third of the frame, to kSigmas; and the box filter across the pixel,
+		//which moves a strip's coverage up to half a pixel inside the cell,
+		//where the perimeter is shorter by 2t / s: 0.5 / s of the loss.
+		const double expectLoss = hBoundaryDepth * ( 1.0 - std::pow( 1.0 - 2.0 * ( 0.5 * hBoundary ) / hCell, 2.0 ) );
+		const double cellArea   = 0.5 * std::sqrt( 3.0 ) * sPx * sPx;
+		const double sdThird    = hCellSpread / std::sqrt( 3.0 ) / std::sqrt( static_cast< double >( w ) * h / 3.0 / cellArea );
+		const double tolLoss    = kSigmas * sdThird + expectLoss * 0.5 / sPx;
+		double worstLoss = 0.0;
+		std::string losses;
+		for( int band = 0; band < 6; ++band )
+		{
+			const double loss = 1.0 - withPattern[ band ] / without[ band ];
+			worstLoss         = worse( worstLoss, std::fabs( loss - expectLoss ) );
+			losses += fmt( "%s%.5f", band == 0 ? " across " : band == 3 ? "; down " : " ", loss );
+		}
+		Check( worstLoss <= tolLoss && brightest < 1.0,
+		       fmt( "%4dx%-4d the light lost to the boundaries in each third of the frame:%s; expected %.5f (8 um strips of a %.2f px cell, %.0f%% "
+		            "deep), worst %+.5f, tolerance %.5f (%g sd of the cells' spread, %.2e, plus 0.5 / s of the loss for the box filter); brightest "
+		            "pixel %.3f (want < 1, nothing clipped)",
+		            w, h, losses.c_str(), expectLoss, sPx, 100.0 * hBoundaryDepth, worstLoss, tolLoss, kSigmas, sdThird, brightest ) );
 	}
 	return Verdict();
 }
@@ -1313,7 +1386,7 @@ int runAlpha( const Perturb& perturb )
 			for( size_t p = 0; p < out.size() / 4; ++p )
 			{
 				const double a = card[ 4 * p + 3 ];
-				worst[ k ]     = std::max( worst[ k ], std::fabs( out[ 4 * p + 3 ] - ( a + ( 1.0 - a ) * mixes[ k ] ) ) );
+				worst[ k ]     = worse( worst[ k ], std::fabs( out[ 4 * p + 3 ] - ( a + ( 1.0 - a ) * mixes[ k ] ) ) );
 			}
 		}
 		//The EBI alone on the transparent side, far from the lit half's halo.
@@ -1325,7 +1398,7 @@ int runAlpha( const Perturb& perturb )
 		double worstEbi   = 0.0;
 		for( int y = margin; y < h - margin; ++y )
 			for( int x = margin; x < w / 2 - margin; ++x )
-				worstEbi = std::max( worstEbi, std::fabs( c[ 4 * ( static_cast< size_t >( y ) * w + x ) + 2 ] / want - 1.0 ) );
+				worstEbi = worse( worstEbi, std::fabs( c[ 4 * ( static_cast< size_t >( y ) * w + x ) + 2 ] / want - 1.0 ) );
 		rig.Set( PT_MIX, 0.0f );
 		if( !rig.Render( 1 ) )
 			return 1;
@@ -1396,7 +1469,7 @@ int runResize( const Perturb& perturb )
 	{
 		if( !moved.Render( 1 ) || !kept.Render( 1 ) )
 			return 1;
-		worstLog = std::max( worstLog, std::fabs( moved.Control()[ 3 ] - kept.Control()[ 3 ] ) );
+		worstLog = worse( worstLog, std::fabs( moved.Control()[ 3 ] - kept.Control()[ 3 ] ) );
 	}
 	const double logTolerance = 1e-4;//three levels of 256 float additions in the frame's sum, each <= 1 ulp
 	Check( spillKept > 1e-3 && std::fabs( spillMoved - spillKept ) <= tolerance && worstLog <= logTolerance && std::fabs( gKept ) > 0.1,
@@ -1618,7 +1691,7 @@ int runTube( const Perturb& perturb )
 			                 std::fabs( static_cast< double >( GainFromParam( v ) ) / hPi / hGainCd( v ) - 1.0 ),
 			                 std::fabs( static_cast< double >( GapFromParam( v ) ) / hGap( v ) - 1.0 ) };
 		for( const double x : d )
-			worst = std::max( worst, x );
+			worst = worse( worst, x );
 	}
 	Check( worst <= 1e-6, fmt( "the conversions: round trips and the harness's own ranges agree to %.2g (tolerance 1e-6)", worst ) );
 	return Verdict();
@@ -1703,6 +1776,7 @@ int runNegative( bool offlineOnly = false )
 	add( "phosphor", runPhosphor, "a decay ten times too long", []( Perturb& p ) { p.tube.tauScale = 10.0; } );
 	add( "phosphor", runPhosphor, "the screen drawn in sRGB white", []( Perturb& p ) { p.whiteScreen = true; } );
 	add( "fixed", runFixed, "the honeycomb drawn 1.25x too large", []( Perturb& p ) { p.tube.cellScale = 1.25; } );
+	add( "fixed", runFixed, "the boundaries not drawn, the cells' spread kept", []( Perturb& p ) { p.boundariesOn = false; } );
 	add( "alpha", runAlpha, "the clip's alpha passed through", []( Perturb& p ) { p.alphaModel = 1; } );
 	add( "alpha", runAlpha, "the clip's light not weighted by its alpha", []( Perturb& p ) { p.premultiply = false; } );
 	add( "resize", runResize, "a new raster clears the phosphor and the ABC", []( Perturb& p ) { p.resizeResets = true; } );
@@ -1760,7 +1834,7 @@ int runBench()
 		int warm, timed;
 	};
 	const Size sizes[] = { { 1280, 720, "720p", 120, 120 }, { 1920, 1080, "1080p", 120, 120 }, { 3840, 2160, "4K", 30, 60 } };
-	std::printf( "\n=== bench: GPU time per frame (GL_TIME_ELAPSED), defaults on the card (Gap 175 um, Fixed Pattern 0.5)\n" );
+	std::printf( "\n=== bench: GPU time per frame (GL_TIME_ELAPSED), the defaults on the card (0.1 lux, Gap 175 um, Fixed Pattern 0.75)\n" );
 	GLuint query = 0;
 	glGenQueries( 1, &query );
 	for( const Size& size : sizes )

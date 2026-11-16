@@ -37,15 +37,17 @@ ControlInfo option( unsigned int id, const char* name, const char* group, float 
 // The defaults. Gen 3 at Hamamatsu's typical luminous gain (4.0e4
 // (lm/m2)/lx = 40,000 fL/fc), a P43 screen, a 175 um gap (a halo of 0.7 mm,
 // the figure quoted for a 4G tube) -- and a Light Level and Fixed Pattern
-// chosen over Resolume's demo clips through --pipe (AGENTS.md says how).
+// set from Resolume's 33 demo clips through --pipe (tools/clips.py
+// defaults): at 0.1 lux the median clip's ABC just engages, and at Fixed
+// Pattern 0.75 the honeycomb matches one frame's photon noise at 100x that.
 //---------------------------------------------------------------------------
 const ControlInfo kTable[] = {
-	standard( PT_LIGHT, "Light Level", "Scene", ParamFromLight( 0.01 ) ),
+	standard( PT_LIGHT, "Light Level", "Scene", ParamFromLight( 0.1 ) ),
 	option( PT_PHOTOCATHODE, "Photocathode", "Tube", static_cast< float >( kGen3 ), kPhotocathodeNames, 2 ),
 	standard( PT_GAIN, "Gain", "Tube", ParamFromGain( 40000.0 ) ),
 	option( PT_PHOSPHOR, "Phosphor", "Tube", static_cast< float >( kP43 ), kPhosphorNames, 2 ),
 	standard( PT_GAP, "Gap", "Tube", ParamFromGap( 175e-6 ) ),
-	standard( PT_FIXED, "Fixed Pattern", "Tube", 0.5f ),
+	standard( PT_FIXED, "Fixed Pattern", "Tube", 0.75f ),
 	standard( PT_MIX, "Mix", "Look", 1.0f ),
 };
 static_assert( sizeof( kTable ) / sizeof( kTable[ 0 ] ) == PT_ABOUT_TEXT, "every control needs a row in the table" );
