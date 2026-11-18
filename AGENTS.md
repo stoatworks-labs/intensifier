@@ -288,6 +288,104 @@ the slider the ABC holds the screen's mean and Gain cancels (Gain 0.2 against 0.
 one 8-bit code in one pixel differs). The sweep's bare pass sees Gain only through its bottom
 end.
 
+## The browser demo (2026-11-18)
+
+`demo/` is <https://intensifier-demo.stoatworks-labs.com>, built to the fleet's
+`resolume-demo` kit rules (`~/Projects/resolume/specs/DEMO-BRIEF.md`), from penumbra's. What a
+reader of it must know:
+
+- **The shaders are the plugin's**: kVersion and all twelve raw-string pieces of
+  `source/Shaders.cpp` (kQuadVertex, kCommon, kRandom, kSamplers and the eight passes), spliced
+  by `demo/tools/check_shaders.py --write` into `demo/shaders.js` and compared character for
+  character, with the assembly on both sides (AssembleVertex, Assemble's switch, InitGL's
+  stages, plugin.js's copy) and every uniform any piece declares named in plugin.js. The
+  integers go through `setInt` (Premultiply, Block, Radius, Fresh, AbcOn, BspOn, the three
+  models, AlphaModel), `setUint` (FrameIndex, Seed), `setSampler`, or `gl.uniform2i` (the
+  ivec2s SourceSize, CoarseSize, HaloSize, OldSize, ViewOrigin, Size); a `.set()` on one fails
+  the check. The vertex stage is the plugin's gl_VertexID triangle, drawn from an empty VAO,
+  not the kit's quad. `tools/verify.sh` runs the check.
+- **The CPU half is a port**, in double, between the PORT and FRAME markers of
+  `demo/plugin.js`: Controls.cpp (the table, geometric and its inverse, OptionIndex with
+  `lround`), Tube.cpp (Compute with the shipped TubeHooks folded in, HaloCdf, BuildHaloKernel
+  with `std::remainder` ported ties-to-even, SpotWeights, PhosphorColour, DecayTime), and the
+  CPU half of Intensifier.cpp: the process-wide seed counter (the page's instance is seed 1),
+  UpdateClock's vote and patience, the frame length (clamped to 0.1 s, rounded to the
+  microsecond, a stopped clock on the last length), the kernel rebuild test, ensureBuffers,
+  render()'s eight passes, the control ping-pong, the coarse grid, the three phosphor stores
+  and the resample, and every uniform in order. `erf` is the page's own (JavaScript has
+  none). Not ported: the log, the About block, ScopedGLState, and the harness's hooks (all off
+  as shipped). The check holds the port to the C++ lines it came from (ORCHESTRATION in
+  check_shaders.py): change Controls, Tube or Intensifier.cpp and change the port, then the
+  anchor.
+- **The composite's viewport is the input's size**, from the origin. The kit draws at the
+  Composition size; a visitor's picture keeps its own size, so changing Composition after
+  loading one leaves it in the corner (the page says so).
+- **Premultiplied clips.** The kit's clips and a visitor's picture are premultiplied; the
+  plugin weights light by alpha as for straight alpha, so a soft edge is weighted twice. Only
+  the "Shape on transparency" clip shows it. Stated on the page, with the README's open
+  question.
+- **A frame is the display's refresh**, not Resolume's: each frame counts photoelectrons over
+  its own length. The page's clock is seconds (the vote settles on seconds within four frames);
+  paused, a control change draws one frame at the last frame's length and the counter
+  advances, so the sparks change, as in a host with a stopped clock.
+- **The page's own `differences` list says all of this on the page.** Keep it true. The line
+  under the picture (the pixel's size on the photocathode, the photoelectrons a white pixel
+  expects, the halo, and every sixth frame the control texel read back) is the page's, and
+  says so. The presets are the page's (the plugin declares none).
+
+How it was verified, and how to again (it needs this Mac's GPU and Chrome, so verify.sh does
+not run it):
+
+- `python3 demo/tools/crosscheck/crosscheck.py --ittest build/ittest [--size 960x540]`. The
+  table of controls first, against `ittest --list` (names, kinds, defaults; the option
+  elements by name through `--set`). Then 16 seeded runs of 12 generated frames (straight
+  alpha: a graded ground, moving discs, stripes, a card whose alpha ramps): the defaults,
+  Gen 2, starlight, no light at 24 fps, twilight, 100 lux gated, low gain at starlight, P45,
+  gaps of 500 and 50 µm, Fixed Pattern 0 and 1, Mix 0.5 and 0, 30 fps, seed 4e9. Each through
+  `ittest --pipe --seed --stats` and through the page's `renderRun` (a fresh instance on the
+  harness's clock, the frames uploaded as ittest uploads them, the composite read back from
+  an RGBA32F target and quantised as ittest quantises). 18 November 2026, M4 Max, Chrome
+  157.0.8103.79 through ANGLE on Metal, against ittest on GL 4.1 (an arm64 build of bf1bd17):
+  **bit-exact**. At 960 × 540 none of 398 million bytes differs; at 480 × 270 one byte of
+  99.5 million differs, by one level (the starlight run). The control texel (the ABC's gain,
+  the gate's duty, the mean lux) equals `--stats` float for float in every frame of every run.
+  Every uniform set, none missing, no GL error, no frame refused; the resample's three
+  uniforms go unset because no run changes the raster (ittest's `--resize` covers that path
+  in the plugin; the page's resample was exercised only by switching Composition, with no
+  console error).
+- The CPU half without a GPU: `tubedump.cpp`, built from Tube.cpp and Controls.cpp with the
+  plugin's Release flags, against the page's port at nine rasters, intervals and settings
+  (1×1 to 3840×2160, 1 µs to 0.1 s): every float the GPU receives (the kernel's weights, the
+  spot) identical, every int identical, every double identical except the phosphor's colour
+  (1–5 ulp) and, in two of the nine, the kernel's raw sum (1 ulp). The phosphor's gap is
+  clang fusing `3.2406 * X - 1.5372 * Y - 0.4986 * Z` into multiply-adds
+  (`-ffp-contract=on`, its default): built with `-ffp-contract=off`, tubedump gives the
+  page's colour to the bit. Both round to the same floats, which is all the GPU sees.
+- Negative controls, each caught (pass: 99.99% of bytes identical over the run, no frame's
+  mean 0.05 levels apart), at 960 × 540 (480 × 270): Light Level one slider step (0.001) off
+  89.6% of bytes identical (96.5%); Gap one step off 99.92% (99.90%); Fixed Pattern one step
+  off 99.94% (99.94%); Gain one step off at starlight 99.92% (99.92%) (at the defaults the ABC
+  takes a Gain step straight back out, so that control is run below the knee); the seed one
+  off 36.5% (43.6%); the frame counter never advancing 41.7% (48.2%).
+- Flash, by xenon's rule (`flashcheck.py`: a transition is an opposing change of 0.1 of white
+  whose darker end is below 0.8; more than 6 in any second fails; the whole frame and 5 × 5
+  windows a third of the frame each way), on the page's own instance read back at 960 × 540,
+  60 fps, linear luminance per pixel: every clip at the defaults, the eleven presets on three
+  clips, 8 s each: **at most 2 transitions in any second in any window, 0 over the whole
+  frame**. The scintillation averages out in any window; a window's mean never moves more
+  than 0.017 of white between frames. What does flash is a visitor's own step up in light:
+  the ABC lags 0.2 s in log gain, so a big step flares the frame towards white once (0.0001
+  to 100 lux: mean 0.99; 0.1 to 3.4 lux: 0.87) before it is pulled back. Stepping Light Level
+  up and down at 1, 2, 3, 4 and 6 times a second gives 2–3, 4–5, 6–7, 8–9 and 12–13
+  transitions a second, so only a visitor working the control three times a second or faster
+  crosses the line. No gate: nothing on the page flashes without the visitor's hand, and one
+  flare per step is the plugin's own behaviour. Light Level's hint says it flares.
+
+The thumb (`stoatworks-labs.com/thumbs/intensifier.png`) and the project page did not exist
+when the demo went live, so `index.html` carries the og:image URL the site will serve but no
+`project-page` meta, and the no-script block links only the repository. Add both when the
+site's page is up.
+
 ## Open questions
 
 - **Straight or premultiplied alpha in Resolume's pipeline?** The plugin weights the clip's

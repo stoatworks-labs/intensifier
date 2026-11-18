@@ -71,6 +71,22 @@ step "Shaders"
 tools/glslc.sh || fail "a shader does not compile"
 
 #---------------------------------------------------------------------------
+step "Browser demo"
+#---------------------------------------------------------------------------
+# demo/shaders.js must be source/Shaders.cpp to the character, joined as
+# Assemble() joins it, every uniform named in demo/plugin.js, and the C++ lines
+# its CPU half was ported from unchanged. The crosscheck against ittest
+# (demo/tools/crosscheck/) needs Chrome and is run by hand (AGENTS.md).
+demo_log="$( mktemp )"
+if python3 demo/tools/check_shaders.py >"$demo_log" 2>&1; then
+	echo "ok   demo/shaders.js is source/Shaders.cpp, and the port's C++ is the text it was ported from"
+else
+	sed 's/^/   /' "$demo_log"
+	fail "the demo's shaders, or the C++ its port was made from, have drifted (demo/tools/check_shaders.py)"
+fi
+rm -f "$demo_log"
+
+#---------------------------------------------------------------------------
 step "Submodule"
 #---------------------------------------------------------------------------
 if [[ ! -f external/ffgl/CMakeLists.txt ]]; then

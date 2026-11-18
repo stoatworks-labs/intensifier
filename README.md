@@ -112,7 +112,20 @@ What part of that each pass takes, and the CPU's time a frame, were not measured
   Arena's DXV demo clips decode to; whether Resolume hands an effect premultiplied colour has
   not been checked.
 - The defaults were measured on the demo clips through `--pipe`, not looked at in a show.
-- No user guide, no presets, no OpenFX port and no browser demo.
+- No user guide, no presets and no OpenFX port.
+
+## Browser demo
+
+**<https://intensifier-demo.stoatworks-labs.com/>** is SW Intensifier in a web page: every
+control with its own name, group and default, over the kit's generated clips or a picture or
+video of yours (decoded in the page, never uploaded). The eight passes are the plugin's own
+GLSL, spliced unedited (`demo/tools/check_shaders.py`, run by `tools/verify.sh`). What runs
+them (the tube's frame factors, the halo's kernel, the clock, the buffers and every uniform) is
+a JavaScript port, and `demo/tools/crosscheck/` runs it and `ittest --pipe` on the same frames
+with the same seed: on this Mac, 16 runs of 12 frames at 960 × 540 came out identical to the
+byte, the control texel float for float. It is a demo, not the plugin, and says what it leaves
+out: the kit's clips are premultiplied where the plugin assumes straight alpha, a frame is the
+display's refresh, and the page has never been compared on another GPU.
 
 ## Build
 
