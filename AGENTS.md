@@ -84,8 +84,10 @@ shutter) are the neighbours not duplicated.
   ABC knee (Ethnik2, 0.1021 lux; the knees run from 0.0076 to 4.6 lux and Bass 001 never
   engages below 100 lux); Fixed Pattern **0.75**, which puts the honeycomb at one frame's photon
   noise at 100× the knee on Ethnik2 at 720p (measured 0.995×) and at 0.160× at the knee.
-- **No OpenFX port, no browser demo, no user guide, no presets, no Windows build tried, no
-  workflows** (no remote; Actions are for public repos only).
+- **No OpenFX port and no presets.** (At the build there was also no browser demo, no user
+  guide, no Windows build and no workflows; the release added them once the repo went public
+  as `stoatworks-labs/intensifier`, where Actions are allowed: `ci.yml` and `release.yml`
+  are xenon's, `tools/wincheck.ps1` penumbra's.)
 
 ## Changes from the spec's first draft
 

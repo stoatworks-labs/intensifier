@@ -98,7 +98,7 @@ What part of that each pass takes, and the CPU's time a frame, were not measured
 
 - **No host has loaded it.** Not Arena, not Avenue, on any platform. `oxbow` (the fleet's test
   host) reads the bundle and renders through it, which is all.
-- **Windows** has never been built, and there is no CI.
+- **Windows** has not been built yet: `release.yml` (GitHub Actions) is the first place it will be.
 - **Chosen, not measured:** the objective (f/1.2, transmission 0.9), the brightness control's
   limit (3 cd/m²) and response time (0.2 s), the gated photocathode's current limit (80 nA),
   the size of a multifibre (0.45 mm, derived) and both depths of the honeycomb. No source for
@@ -147,7 +147,8 @@ That's the whole lot: shader hygiene and `glslc`, a fresh universal build with n
 the bundle's architecture, plist and ad-hoc signature, a host's view of it through `oxbow`
 (required), every check at two rasters and again on the software renderer, the alpha check on
 Arena's demo clips (required), the pipe, the negative controls, the mutants, the sweep for
-dead controls and the render cost. There is no CI: this script is the verification.
+dead controls and the render cost. CI (`ci.yml`) builds on macOS and Windows and runs the
+checks that need no GL; the pixel checks need a GPU, so this script is where they run.
 `CLAUDE.md` lists the checks one by one; `./build/ittest --all` runs them all.
 
 Render a frame of your own:
