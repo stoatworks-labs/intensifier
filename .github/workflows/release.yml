@@ -71,7 +71,7 @@ jobs:
       - name: Check the DLL (Windows)
         if: runner.os == 'Windows'
         run: |
-          ./tools/wincheck.ps1 -Dll "build/Release/Intensifier.dll" -Name "SW Intensifier" -Id IT01 -Kind effect -Params 11 -First "Light Level"
+          ./tools/wincheck.ps1 -Dll "build/Release/Intensifier.dll" -Name "SW Intensifier" -Id IT01 -Kind effect -Params 12 -First "Light Level"
           if( $LASTEXITCODE ) { exit $LASTEXITCODE }
 
       - name: Derive version

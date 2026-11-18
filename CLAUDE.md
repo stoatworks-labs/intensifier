@@ -90,9 +90,12 @@ and is kept in step with this repo.
 - `intensifier_core` is an OBJECT library: the plugin registers itself from a file-scope
   constructor nothing references.
 - The macOS build must be universal. Check with `lipo`, never the build log.
-- **Provisional hand copies:** `source/StoatworksAbout*.h` (guide = "", no user guide) and
-  `ATTRIBUTIONS.md`. Once the project is registered in stoatworks-backend, `sync-about.py`
-  and `sync-attributions.py` generate them; edit them there then.
+- **Generated, never edit here:** `source/StoatworksAbout.h`, `ATTRIBUTIONS.md` (and the
+  README's attributions block), the issue forms and `.github/FUNDING.yml` come from
+  stoatworks-backend's sync scripts (registered 2026-11-18). Edit them there and re-sync.
+  sync-about added the User guide button, so the plugin declares 12 parameters (the 7
+  controls, the About text and three link buttons). `StoatworksAboutLinks.h` and
+  `StoatworksAboutParams.h` are the FFGL renderer, this repo's own.
 - **Workflows** (the repo is public, `stoatworks-labs/intensifier`, so Actions are allowed):
   `ci.yml` builds on macOS (arm64, `ittest --list` and `--offline`, `glslc`) and Windows on
   every push and pull request; `release.yml` builds the universal bundle and the x64 DLL
