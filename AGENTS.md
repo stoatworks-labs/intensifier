@@ -197,9 +197,15 @@ numbers; a moving clip in Resolume.
 
 ## In Resolume (v0.1.0, 18 November 2026)
 
-- **Windows, win-lab: not run at the tag.** The winlab lock was held by another release for
-  the whole window; the release DLL passed `tools/wincheck.ps1` in CI.
-  `plugin-bench/arena/expect/intensifier.json` is the gate's expectation file.
+- **Windows, win-lab, Arena 7.27.1, llvmpipe**, run 15 minutes after the tag (the lock was
+  held through the tag window): the release zip's DLL through
+  `plugin-bench/arena/arenaprobe.py --expect arena/expect/intensifier.json` (plugin-bench
+  5fdd7d3): 9 passed, 0 failed, 0 skipped. 13 controls (with Opacity) as declared; render
+  48.15 levels from the bare input against a 0.54 floor; every control live: Light Level
+  54.7, Mix and Opacity 48.1, Phosphor 38.7, Gain 19.2, Gap 5.9, Photocathode 2.9, Fixed
+  Pattern 2.3 (Gain at Light 0.2857, Gap and Fixed Pattern at 0.857, the expect file's
+  `needs`). The thumbnail served the bare input to 3 grabs (one outlasted 5.5 s). Plugin log:
+  Mesa 26.2 llvmpipe, GL 4.5 core, clock raw 50007.55 → scale 0.001.
 - **macOS, Arena 7.29.0, Apple M4 Max**, a local universal build of 3914e59 in Extra Effects
   (removed after), probed over REST on 8080 by the release's `macprobe.py` (filings'
   pattern): one layer added over the show, a 1920×1080 still of Trinity_09 (Alpha, opacity

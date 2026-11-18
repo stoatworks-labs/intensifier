@@ -36,9 +36,8 @@ IntoTheGlow_21, rendered by the offline harness rather than captured from Resolu
 > control holds the screen within **0.13 %** of its limit across a 100-fold step in the light,
 > at 30, 60 and 120 fps. Twenty-seven deliberately wrong versions of the plugin and 36
 > one-character sabotages of its code are all caught, and all 7 controls change the picture.
-> It has been loaded into Resolume Arena on a Mac, where every control was there and did
-> what it does here, but only over a still picture, never in a show, and not yet in Arena on
-> Windows. But several of the tube's numbers are **chosen**, not measured (see
+> It has been loaded into Resolume Arena on a Mac and on Windows, where every control was
+> there and did what it does here, but only over still pictures, never in a show. But several of the tube's numbers are **chosen**, not measured (see
 > [Known limits](#known-limits)). **Try it on a spare layer first**, and shout if anything
 > misbehaves.
 >
@@ -218,12 +217,12 @@ and **3.4 ms** at 4K. Another GPU will differ, and nothing has been timed inside
 
 ## Known limits
 
-- **It has barely met Resolume.** It ran in Arena 7.29.0 on an Apple M4 Max, mounted over
-  Arena's API on a still of one of Resolume's demo clips: all 12
-  controls were there with their defaults, and Light Level, Gain, Phosphor, Gap, Fixed
-  Pattern and Mix each did what this guide says. It hasn't run in Arena on Windows yet (only
-  in a test loader there), on a moving clip in Resolume, or in a show, and its cost inside
-  Arena wasn't measured.
+- **It has barely met Resolume.** It ran in Arena 7.29.0 on an Apple M4 Max and in Arena
+  7.27.1 on Windows (software rendering, no GPU), mounted over Arena's API on still
+  pictures. On the Mac all 12 controls were there with their defaults, and Light Level,
+  Photocathode, Gain, Phosphor, Gap, Fixed Pattern and Mix each did what this guide says; on
+  Windows the same 12 were there and every control changed the picture. It hasn't run on a
+  moving clip in Resolume, or in a show, and its cost inside Arena wasn't measured.
 
 - **Straight or premultiplied alpha?** The plugin treats your clip's colour as straight alpha,
   which is how Resolume's own demo clips decode. If Resolume hands effects premultiplied
@@ -250,8 +249,8 @@ and **3.4 ms** at 4K. Another GPU will differ, and nothing has been timed inside
   (a real tube also sees near infrared, which a video clip doesn't carry), and both phosphors
   decay as single exponentials.
 - **Other GPUs.** The counting is measured on one Apple GPU and Apple's software renderer, and
-  it has run in Arena on that Mac; the browser demo, a port of it, matched the harness to the
-  byte on the same Mac.
+  it has run in Arena on that Mac and on Windows with Mesa's llvmpipe; the browser demo, a
+  port of it, matched the harness to the byte on the same Mac.
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
 > (Anthropic), directed and reviewed by a human author. It has been loaded into Resolume
-> Arena on macOS and ran there (see [Status](#status)). Everything else below
+> Arena on macOS and on Windows and ran there (see [Status](#status)). Everything else below
 > is established by an offline harness, `ittest`, that drives
 > the real plugin class through the same `ProcessOpenGL` a host calls, in a headless GL
 > context on a synthetic clock, on this Mac's GPU at two rasters and on Apple's software
@@ -105,8 +105,7 @@ opaque at Mix 1.
 ## Status
 
 **v0.1.0, 18 November 2026, and early days.** It has been loaded into Resolume Arena on
-macOS (below), over a still of one of Resolume's demo clips: never a moving clip, never in a
-show. On Windows only a test loader has run it so far. The macOS build is Developer ID-signed and notarised. There's a
+Windows and on macOS (below), over still pictures: never a moving clip, never in a show. The macOS build is Developer ID-signed and notarised. There's a
 [user guide](docs/USER-GUIDE.md) and a [browser demo](#browser-demo), but no OpenFX port and
 no presets.
 
@@ -120,9 +119,16 @@ composition snapshot over REST, 18 November 2026: a still of Resolume's demo cli
 at 10 lux (Light Level 0.857) with Gap at 500 µm, the rest at the defaults. The halos are the
 photoelectrons that bounced back off the plate.</sub>
 
-- **Windows:** the release's x64 DLL loads in `tools/wincheck.ps1` as a host loads it
-  (`IT01`, effect, 12 parameters), in CI. The fleet's Arena gate on win-lab had not run on it
-  when v0.1.0 was tagged: win-lab was busy with another release.
+- **Windows: Arena 7.27.1 on win-lab, software rendering (Mesa llvmpipe, no GPU)**, the
+  release's own x64 DLL, through the fleet's Arena gate on 18 November 2026, shortly after
+  the tag: **9 passed, 0 failed, 0 skipped**. Arena loaded it and registered `SW Intensifier`
+  `IT01` as an effect; all 12 parameters (with Arena's Opacity) matched name, order, type,
+  range and default; the frame had content, 48 levels from the bare input at the defaults
+  against a 0.54-level noise floor; and every control moved the picture, Gain, Gap and Fixed
+  Pattern each at the Light Level where it acts (Light Level 54.7 levels, Mix 48.1, Phosphor
+  38.7, Gain 19.2, Gap 5.9, Photocathode 2.9, Fixed Pattern 2.3). No shader or error lines in
+  Arena's log, and Arena stayed up. The plugin's own log: llvmpipe (Mesa 26.2), `initialised`,
+  and Arena's clock in milliseconds, detected (scale 0.001).
 - **macOS: Arena 7.29.0 on an Apple M4 Max**, a local universal build of this source (ad-hoc
   signed, not the notarised download), mounted on a clip over Arena's REST API and read off
   Arena's composition snapshot (the middle three fifths of a 1920×1080 JPEG), over a still of
@@ -140,6 +146,8 @@ photoelectrons that bounced back off the plate.</sub>
     2 s later **34.9**. That is the flare, and the tube pulling it back;
   - at 0.001 lux, Gain 0 → 1 took the mean from **0.5** to **10.2**: Gain acts below the
     limit;
+  - at 0.001 lux, Gen 2 against Gen 3: as bright to within 10% in linear light, and
+    grainier (the picture's deviation from a 9-pixel blur **11.6** levels against **7.8**);
   - Gap 500 µm wraps each ring in a wide halo (above), 50 µm in a tight one;
   - over a white still at 10 and 100 lux, a spectral line at the honeycomb's row spacing
     (23 px in 1080) is **0.45** levels deep at Fixed Pattern 1 and **0.006** at 0: there,
@@ -147,7 +155,7 @@ photoelectrons that bounced back off the plate.</sub>
   - Arena was quit without saving.
 
 Not measured in Resolume: its cost, a moving clip, whether Arena hands an effect straight or
-premultiplied colour (the plugin assumes straight), and any GPU but the M4 Max, and Windows at all.
+premultiplied colour (the plugin assumes straight), and any GPU but the M4 Max and llvmpipe.
 
 ### Measured offline, on macOS
 
