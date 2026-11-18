@@ -1,0 +1,24 @@
+/* The photosensitivity note above the demo (xenon's warning box, without its
+   Start gate: nothing here flashes until a visitor moves Light Level). */
+.it-warning {
+  /* #demo is 1400px wide with a 20px gutter: line up with what is inside it. */
+  max-width: 1360px;
+  margin: 24px auto 0;
+  padding: 14px 18px;
+  background: #1f1a0c;
+  border: 1px solid #5a4613;
+  border-left: 4px solid var(--warn);
+  border-radius: 8px;
+}
+@media (max-width: 1400px) {
+  .it-warning { margin-left: 20px; margin-right: 20px; }
+}
+@media (max-width: 480px) {
+  .it-warning { padding: 12px 14px; }
+}
+.it-warning__title {
+  font-size: 16px;
+  color: var(--warn);
+  margin: 0 0 4px;
+}
+.it-warning p { margin: 6px 0 0; max-width: 80ch; font-size: 14px; }

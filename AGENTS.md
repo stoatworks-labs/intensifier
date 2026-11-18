@@ -192,8 +192,37 @@ photocathode sees luminance only (no spectral response); single-exponential phos
 input, so `--poisson` cannot see η's value (only a sign error, mutant 7). `--halo` measures the
 rim and the ring's presence, not its share.
 
-Not done: loading it into Resolume on any platform; a Windows build; a user guide, presets,
-an OpenFX port, a browser demo; looking at the demo clips in a show rather than as numbers.
+Not done: presets, an OpenFX port; looking at the demo clips in a show rather than as
+numbers; a moving clip in Resolume.
+
+## In Resolume (v0.1.0, 18 November 2026)
+
+- **Windows, win-lab: not run at the tag.** The winlab lock was held by another release for
+  the whole window; the release DLL passed `tools/wincheck.ps1` in CI.
+  `plugin-bench/arena/expect/intensifier.json` is the gate's expectation file.
+- **macOS, Arena 7.29.0, Apple M4 Max**, a local universal build of 3914e59 in Extra Effects
+  (removed after), probed over REST on 8080 by the release's `macprobe.py` (filings'
+  pattern): one layer added over the show, a 1920×1080 still of Trinity_09 (Alpha, opacity
+  1), SW Intensifier added by `effect:///video/SW%20Intensifier`, and every reading taken off
+  `GET /composition/monitors/1/snapshot.jpg` (middle 3/5). The tube redraws every frame, so
+  no reading is "identical": each is set against a same-settings pair (4.9 levels a pixel at
+  the defaults, 0.67 at 10 lux). 12 of 12 parameters shown, defaults as declared; the log
+  showed the clock arriving in ms (raw 7.67e8, scale 0.001). Mix 0 equalled the bare still
+  (0.0). P45: green ratio 1.82 → 1.04. Light 0 → mean 0.75 from 34.6; Light 1 → 34.9 (held).
+  A step 1e-3 → 10 lux read 69.9 at once and 34.9 after 2 s (the flare). Gain 0 → 1 at 1e-3
+  lux: 0.5 → 10.2. Gap 500 µm: wide halos. **The honeycomb is invisible to a mean-difference
+  reading** (Fixed Pattern 0 vs 1 at 10 lux: 0.70 and 0.74 against a 0.67 floor) but plain
+  in the spectrum: over a white still at 10 and 100 lux a line at (ky 28 of a 648-row crop,
+  kx 0), the lattice's 23 px row spacing, is 0.45 levels deep at FP 1 and 0.006 at FP 0
+  (JPEG's 8 px block line dominates at FP 0). Quit came up as the "Quit!" dialog; Quit, not
+  Save & Quit; every .avc's mtime unchanged.
+- A trap when reading snapshots: Gap 500 µm raised the crop's mean from 34.9 to 48.4 levels
+  (linear 0.099 to 0.116; 50 µm gave 0.087) although the ABC holds the screen's mean. The
+  rings clip at white (7.9% of the crop's pixels saturated), so halo light moved off them
+  into dark pixels shows where it was clipped before, and the gamma encoding exaggerates it.
+  Compare like with like, never a mean against the ABC's limit. Gen 2 against Gen 3 at 1e-3
+  lux: linear means 0.0057 and 0.0063, as bright to within 10% through a JPEG that smooths
+  Gen 2's sparser, brighter sparks.
 
 ## Would this hold on another rasteriser, at another raster?
 
@@ -391,7 +420,7 @@ site's page is up.
 - **Straight or premultiplied alpha in Resolume's pipeline?** The plugin weights the clip's
   light by α (right for straight alpha, and Arena's DXV clips decode straight through ffmpeg).
   If Resolume hands an effect premultiplied colour, transparent edges are darkened twice.
-  Needs a look in Arena.
+  Needs a look in Arena with an alpha clip (the v0.1.0 probe used an opaque still).
 - **L_max and τ_ABC** (3 cd/m², 0.2 s) are chosen; a real tube's ABC response and output limit
   would replace them. Photonis's XR5 leaflet reportedly gives about 4 cd/m² and could not be
   fetched.

@@ -7,6 +7,7 @@
     <meta name="description" content="Try SW Intensifier, an FFGL effect for Resolume, in your browser: a night-vision image intensifier tube looking at the clip, counting photoelectrons a pixel a frame, so the picture scintillates at starlight and thickens as the light comes up, halos ring bright points and the whole frame dims when something bright comes in. The plugin's own GLSL, ported to WebGL2 unedited, run by a JavaScript port of its CPU half. A demo, not the plugin." />
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./vendor/kit.css" />
+    <link rel="stylesheet" href="./intensifier.css" />
     <link rel="canonical" href="https://intensifier-demo.stoatworks-labs.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Stoatworks Labs" />
@@ -20,6 +21,17 @@
     <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body data-plugin="intensifier">
+    <section class="it-warning" id="photosensitivity" aria-labelledby="it-warning-title">
+      <h2 class="it-warning__title" id="it-warning-title">Photosensitivity warning</h2>
+      <p>
+        This effect turns dark pictures up, so a dark clip that pulses can flash brightly through
+        it, and a big step up in <strong>Light Level</strong> flares the whole picture once before
+        the tube pulls it back. Flashing light can trigger seizures in people with photosensitive
+        epilepsy. Left alone, this page's clips do not flash; stepping Light Level up and down
+        three or more times a second does.
+      </p>
+    </section>
+
     <main id="demo">
       <noscript>
         <h1>SW Intensifier</h1>

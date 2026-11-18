@@ -1,8 +1,9 @@
 # intensifier
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. **It has never been loaded into
-> Resolume.** What's established is established by an offline harness, `ittest`, that drives
+> (Anthropic), directed and reviewed by a human author. It has been loaded into Resolume
+> Arena on macOS and ran there (see [Status](#status)). Everything else below
+> is established by an offline harness, `ittest`, that drives
 > the real plugin class through the same `ProcessOpenGL` a host calls, in a headless GL
 > context on a synthetic clock, on this Mac's GPU at two rasters and on Apple's software
 > renderer. Read out of the plugin's own count buffer, the photoelectron counts are **Poisson
@@ -30,6 +31,14 @@ mean brightness; in a very bright scene the photocathode is gated off for part o
 and the grain comes back. At high light a faint honeycomb, the fibre optics' multifibres,
 shows through.
 
+**Photosensitivity.** The tube turns a dark clip up, so a dark clip that pulses pulses
+bright: measured with the WCAG general-flash rule (more than three flashes a second over the
+whole frame or any third-of-frame window), **4** of Resolume's 33 demo clips cross the line
+through it at the defaults where the bare clips did not, and **10** at 10 lux. Scintillation
+on its own never does (none at 0.001 lux). A big step up in Light Level flares the whole
+picture once before the tube pulls it back, so stepping it up and down three or more times a
+second flashes. The [user guide](docs/USER-GUIDE.md#flashing) has the numbers.
+
 ## Controls
 
 | Group | |
@@ -55,7 +64,50 @@ opaque at Mix 1.
 
 ## Status
 
-**v0.1.0, local only, 16 November 2026. Never loaded into Resolume.**
+**v0.1.0, 18 November 2026, and early days.** It has been loaded into Resolume Arena on
+macOS (below), over a still of one of Resolume's demo clips: never a moving clip, never in a
+show. On Windows only a test loader has run it so far. The macOS build is Developer ID-signed and notarised. There's a
+[user guide](docs/USER-GUIDE.md) and a [browser demo](#browser-demo), but no OpenFX port and
+no presets.
+
+### In Resolume
+
+![Three glowing rings in a triangle, green and yellow-green on black, each wrapped in a wide
+soft green halo, as Resolume Arena's own composition snapshot shows them](docs/arena.jpg)
+
+<sub>SW Intensifier inside Resolume Arena 7.29.0 on an Apple M4 Max, from Arena's
+composition snapshot over REST, 18 November 2026: a still of Resolume's demo clip Trinity_09
+at 10 lux (Light Level 0.857) with Gap at 500 µm, the rest at the defaults. The halos are the
+photoelectrons that bounced back off the plate.</sub>
+
+- **Windows:** the release's x64 DLL loads in `tools/wincheck.ps1` as a host loads it
+  (`IT01`, effect, 12 parameters), in CI. The fleet's Arena gate on win-lab had not run on it
+  when v0.1.0 was tagged: win-lab was busy with another release.
+- **macOS: Arena 7.29.0 on an Apple M4 Max**, a local universal build of this source (ad-hoc
+  signed, not the notarised download), mounted on a clip over Arena's REST API and read off
+  Arena's composition snapshot (the middle three fifths of a 1920×1080 JPEG), over a still of
+  Trinity_09:
+  - all **12** parameters shown (with Arena's own Opacity) at the declared defaults, and the
+    About line `Intensifier v0.1.0 - MIT - Stoatworks Labs, stoatworks-labs.com`. Its log:
+    the M4 Max, `initialised`, and Arena's clock arriving in milliseconds, which it detected
+    (scale 0.001);
+  - two snapshots a second apart at the defaults differ by **4.9** levels a pixel: the tube
+    redraws every frame. Mix 0 gives the bare still exactly (**0.0**);
+  - P45 takes the green ratio G / ((R + B) / 2) from **1.82** to **1.04**: white;
+  - Light Level 0 (0.00001 lux) drops the mean from **34.6** levels to **0.75** (sparks);
+    Light Level 1 (100 lux) leaves it at **34.9**: the brightness control holding;
+  - a step from 0.001 to 10 lux: the first snapshot after it had a mean of **69.9**, the one
+    2 s later **34.9**. That is the flare, and the tube pulling it back;
+  - at 0.001 lux, Gain 0 → 1 took the mean from **0.5** to **10.2**: Gain acts below the
+    limit;
+  - Gap 500 µm wraps each ring in a wide halo (above), 50 µm in a tight one;
+  - over a white still at 10 and 100 lux, a spectral line at the honeycomb's row spacing
+    (23 px in 1080) is **0.45** levels deep at Fixed Pattern 1 and **0.006** at 0: there,
+    and faint, as meant;
+  - Arena was quit without saving.
+
+Not measured in Resolume: its cost, a moving clip, whether Arena hands an effect straight or
+premultiplied colour (the plugin assumes straight), and any GPU but the M4 Max, and Windows at all.
 
 ### Measured offline, on macOS
 
@@ -96,23 +148,30 @@ What part of that each pass takes, and the CPU's time a frame, were not measured
 
 ### Not established
 
-- **No host has loaded it.** Not Arena, not Avenue, on any platform. `oxbow` (the fleet's test
-  host) reads the bundle and renders through it, which is all.
-- **Windows** has not been built yet: `release.yml` (GitHub Actions) is the first place it will be.
 - **Chosen, not measured:** the objective (f/1.2, transmission 0.9), the brightness control's
   limit (3 cd/m²) and response time (0.2 s), the gated photocathode's current limit (80 nA),
   the size of a multifibre (0.45 mm, derived) and both depths of the honeycomb. No source for
   any of them was reached.
-- **The halo's share** (7.4% of photoelectrons) rests on one reading of a patent's sentence,
-  and nothing measures it off the picture: the harness measures the rim and that the ring is
-  there.
+- **The halo's share** (7.4% of photoelectrons) rests on one reading of a patent's sentence;
+  the other reading (η) makes it **2.7×** stronger. Nothing measures it off the picture: the
+  harness measures the rim and that the ring is there.
+- **Gain is dead above the brightness limit**, over the top three quarters of its range at
+  the defaults. Faithful to a tube, but it reads as a dead slider; a later version may
+  relabel it or let it move the limit.
+- **The default light, 0.1 lux,** is where the median demo clip brings the brightness control
+  in. It was measured, not judged in a show, and a darker default would be noisier and more
+  dramatic.
+- **Some clips never reach the limit:** Resolume's nearly black Bass 001 doesn't engage the
+  brightness control even at 100 lux, the top of Light Level.
+- **No round eyepiece field.** A real scope shows a circle; here the whole frame is
+  photocathode. An option for it may come later.
 - **Back-scatter is assumed Lambertian**; the photocathode sees luminance only (no spectral
   response); both phosphors are single exponentials.
 - **Resolume's alpha.** The plugin treats a clip's colour as straight alpha, which is what
   Arena's DXV demo clips decode to; whether Resolume hands an effect premultiplied colour has
-  not been checked.
+  not been checked, in Arena or anywhere else.
 - The defaults were measured on the demo clips through `--pipe`, not looked at in a show.
-- No user guide, no presets and no OpenFX port.
+- No presets and no OpenFX port.
 
 ## Browser demo
 
