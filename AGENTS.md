@@ -411,9 +411,8 @@ not run it):
   flare per step is the plugin's own behaviour. Light Level's hint says it flares.
 
 The thumb (`stoatworks-labs.com/thumbs/intensifier.png`) and the project page did not exist
-when the demo went live, so `index.html` carries the og:image URL the site will serve but no
-`project-page` meta, and the no-script block links only the repository. Add both when the
-site's page is up.
+when the demo went live; since v0.1.0's site push `index.html` carries the `project-page`
+meta, and the no-script block links the project page and the guide as well as the repository.
 
 ## Open questions
 
