@@ -71,6 +71,14 @@ macOS builds are signed and notarised and open normally. The Windows builds are 
 
 <!-- downloads:end -->
 
+## Video
+
+> **Photosensitivity warning:** this effect turns dark clips up, so a clip that pulses can
+> flash brightly through it. Large-area flashes in the video are kept to three a second or
+> fewer.
+
+[![Intensifier: night vision that counts photons, for Resolume](docs/video-thumb.png)](https://www.youtube.com/watch?v=n6-1X9scw5g)
+
 ## Controls
 
 | Group | |
